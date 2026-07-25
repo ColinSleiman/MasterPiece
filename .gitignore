@@ -1,19 +1,38 @@
-# Virtual environments
+# Python cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual and Conda environments
 .venv/
 venv/
 env/
-
-# Python cache
-__pycache__/
-*.py[cod]
+.conda/
+conda-env/
 
 # Environment variables and secrets
 .env
 .env.*
+.streamlit/secrets.toml
 
-# Editor configuration
+# Editor and operating-system metadata
 .vscode/
-
-# Operating-system files
+.idea/
 .DS_Store
 Thumbs.db
+
+# Generated vectorization output
+*.pbm
+*.svg
+*.pdf
+*.zip
+
+# Temporary processing folders and logs
+temp/
+tmp/
+.tmp/
+*.log

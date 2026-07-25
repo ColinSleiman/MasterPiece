@@ -1,0 +1,9 @@
+services:
+  image-vectorizer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: image-vectorizer
+    ports:
+      - "8501:8501"
+    restart: unless-stopped

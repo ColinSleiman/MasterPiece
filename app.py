@@ -1,243 +1,229 @@
+"""Streamlit presentation layer for Image Vectorizer."""
+
+from __future__ import annotations
+
 from io import BytesIO
+from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import streamlit as st
 
-from image_processor import process_image
+from image_processor import VectorizedImage, process_image
 
+
+SUPPORTED_IMAGE_TYPES = ["png", "jpg", "jpeg", "bmp", "webp"]
 
 st.set_page_config(
     page_title="Image Vectorizer",
-    page_icon="🖼️",
-    layout="wide"
+    page_icon=":material/polyline:",
+    layout="wide",
 )
 
 
-# Store generated files across Streamlit reruns.
-if "processed_files" not in st.session_state:
-    st.session_state.processed_files = []
-
-
-def create_zip(processed_files: list[dict]) -> bytes:
-    """
-    Create a ZIP archive containing all generated SVG and PDF files.
-    """
-
+def create_zip(processed_files: list[VectorizedImage]) -> bytes:
+    """Build an in-memory archive containing every successful result."""
     zip_buffer = BytesIO()
+    used_names: set[str] = set()
 
-    with ZipFile(
-        zip_buffer,
-        mode="w",
-        compression=ZIP_DEFLATED
-    ) as zip_file:
+    def unique_archive_name(filename: str) -> str:
+        path = Path(filename)
+        candidate = filename
+        counter = 2
+        while candidate.casefold() in used_names:
+            candidate = f"{path.stem}_{counter}{path.suffix}"
+            counter += 1
+        used_names.add(candidate.casefold())
+        return candidate
+
+    with ZipFile(zip_buffer, mode="w", compression=ZIP_DEFLATED) as zip_file:
         for result in processed_files:
             zip_file.writestr(
-                result["svg_filename"],
-                result["svg_data"]
+                unique_archive_name(result["svg_filename"]),
+                result["svg_bytes"],
             )
-
             zip_file.writestr(
-                result["pdf_filename"],
-                result["pdf_data"]
+                unique_archive_name(result["pdf_filename"]),
+                result["pdf_bytes"],
             )
-
     return zip_buffer.getvalue()
 
 
-# Small UI improvements.
-st.markdown(
+def initialize_state() -> None:
+    """Initialize persistent values used across Streamlit reruns."""
+    st.session_state.setdefault("processed_files", [])
+    st.session_state.setdefault("processing_errors", [])
+
+
+def clear_results() -> None:
+    """Remove generated results and their associated errors."""
+    st.session_state.processed_files = []
+    st.session_state.processing_errors = []
+
+
+def render_previews(uploaded_files: list) -> None:
+    """Render compact previews in a four-column grid."""
+    st.subheader("Image previews")
+    preview_columns = st.columns(4)
+    for index, uploaded_file in enumerate(uploaded_files):
+        with preview_columns[index % 4]:
+            st.image(uploaded_file, caption=uploaded_file.name, width=210)
+
+
+def process_uploads(uploaded_files: list, threshold_value: int) -> None:
+    """Process every upload independently and retain successes and errors."""
+    processed_files: list[VectorizedImage] = []
+    processing_errors: list[str] = []
+    progress_bar = st.progress(0)
+    status_message = st.empty()
+
+    for index, uploaded_file in enumerate(uploaded_files):
+        status_message.write(f"Processing `{uploaded_file.name}`...")
+        try:
+            processed_files.append(process_image(uploaded_file, threshold_value))
+        except Exception as error:
+            processing_errors.append(f"{uploaded_file.name}: {error}")
+
+        progress_bar.progress((index + 1) / len(uploaded_files))
+
+    status_message.empty()
+    progress_bar.empty()
+    st.session_state.processed_files = processed_files
+    st.session_state.processing_errors = processing_errors
+
+
+def render_results() -> None:
+    """Render persistent processing messages and download controls."""
+    processed_files: list[VectorizedImage] = st.session_state.processed_files
+    processing_errors: list[str] = st.session_state.processing_errors
+
+    if processing_errors:
+        for message in processing_errors:
+            st.error(f"Failed to process {message}")
+
+    if not processed_files:
+        return
+
+    st.success(f"Successfully processed {len(processed_files)} image(s).")
+
+    results_heading, zip_column, clear_column = st.columns(
+        [3.5, 1.5, 1.2],
+        vertical_alignment="center",
+    )
+    with results_heading:
+        st.header("Download results")
+    with zip_column:
+        st.download_button(
+            "Download All as ZIP",
+            data=create_zip(processed_files),
+            file_name="vectorized_images.zip",
+            mime="application/zip",
+            key="download-all-zip",
+            on_click="ignore",
+            type="primary",
+            icon=":material/folder_zip:",
+            width="stretch",
+        )
+    with clear_column:
+        st.button(
+            "Clear Results",
+            key="clear-results",
+            on_click=clear_results,
+            icon=":material/delete_sweep:",
+            width="stretch",
+        )
+
+    for index, result in enumerate(processed_files):
+        with st.container(border=True):
+            information_column, svg_column, pdf_column = st.columns(
+                [4, 1.25, 1.25],
+                vertical_alignment="center",
+            )
+            with information_column:
+                st.markdown(f"#### {result['original_filename']}")
+                st.caption(
+                    f"SVG: {result['svg_filename']}  \n"
+                    f"PDF: {result['pdf_filename']}"
+                )
+            with svg_column:
+                st.download_button(
+                    "Download SVG",
+                    data=result["svg_bytes"],
+                    file_name=result["svg_filename"],
+                    mime="image/svg+xml",
+                    key=f"download-svg-{index}",
+                    on_click="ignore",
+                    icon=":material/download:",
+                    width="stretch",
+                )
+            with pdf_column:
+                st.download_button(
+                    "Download PDF",
+                    data=result["pdf_bytes"],
+                    file_name=result["pdf_filename"],
+                    mime="application/pdf",
+                    key=f"download-pdf-{index}",
+                    on_click="ignore",
+                    icon=":material/download:",
+                    width="stretch",
+                )
+
+
+initialize_state()
+
+st.html(
     """
     <style>
         .block-container {
-            max-width: 1200px;
-            padding-top: 2rem;
+            max-width: 1180px;
+            padding-top: 2.25rem;
             padding-bottom: 4rem;
         }
-
         [data-testid="stImage"] img {
-            border-radius: 10px;
+            border-radius: 0.6rem;
             object-fit: contain;
         }
-
         [data-testid="stFileUploader"] {
-            max-width: 750px;
+            max-width: 760px;
         }
-
         div[data-testid="stButton"] button,
         div[data-testid="stDownloadButton"] button {
-            border-radius: 8px;
-            min-height: 42px;
+            min-height: 2.6rem;
+            border-radius: 0.5rem;
         }
     </style>
-    """,
-    unsafe_allow_html=True
+    """
 )
-
 
 st.title("Image Vectorizer")
-
 st.caption(
-    "Upload one or more images, select a threshold, "
-    "and generate SVG and vector PDF files."
+    "Convert PNG, JPEG, BMP, or WebP images into scalable SVG and vector PDF files."
 )
-
-st.divider()
-
 
 uploaded_files = st.file_uploader(
     "Upload images",
-    type=["png", "jpg", "jpeg", "bmp", "webp"],
+    type=SUPPORTED_IMAGE_TYPES,
     accept_multiple_files=True,
-    help="Supported formats: PNG, JPG, JPEG, BMP and WebP."
+    help="Select one or more PNG, JPG, JPEG, BMP, or WebP files.",
 )
-
 threshold_value = st.slider(
     "Threshold value",
     min_value=0,
     max_value=255,
     value=180,
     step=1,
-    help=(
-        "Lower values preserve darker areas. "
-        "Higher values include more of the image."
-    )
+    help="Higher values include more light pixels in the traced foreground.",
 )
 
-
 if uploaded_files:
-    st.subheader("Image Preview")
+    render_previews(uploaded_files)
 
-    preview_columns = st.columns(4)
-
-    for index, uploaded_file in enumerate(uploaded_files):
-        with preview_columns[index % 4]:
-            st.image(
-                uploaded_file,
-                caption=uploaded_file.name,
-                width=220
-            )
-
-
-process_clicked = st.button(
+if st.button(
     "Process Images",
     type="primary",
     disabled=not uploaded_files,
-    use_container_width=False
-)
+    key="process-images",
+    icon=":material/conversion_path:",
+):
+    process_uploads(uploaded_files, threshold_value)
 
-
-if process_clicked:
-    processed_files = []
-
-    progress_bar = st.progress(0)
-    status_message = st.empty()
-
-    for index, uploaded_file in enumerate(uploaded_files):
-        status_message.write(
-            f"Processing `{uploaded_file.name}`..."
-        )
-
-        try:
-            result = process_image(
-                uploaded_file,
-                threshold_value
-            )
-
-            processed_files.append(result)
-
-        except Exception as error:
-            st.error(
-                f"Failed to process {uploaded_file.name}: {error}"
-            )
-
-        progress = int(
-            ((index + 1) / len(uploaded_files)) * 100
-        )
-
-        progress_bar.progress(progress)
-
-    status_message.empty()
-    progress_bar.empty()
-
-    # Save results so they remain after download clicks and reruns.
-    st.session_state.processed_files = processed_files
-
-
-processed_files = st.session_state.processed_files
-
-
-if processed_files:
-    st.divider()
-
-    st.success(
-        f"Successfully processed {len(processed_files)} image(s)."
-    )
-
-    results_header, zip_column = st.columns(
-        [3, 1],
-        vertical_alignment="center"
-    )
-
-    with results_header:
-        st.header("Download Results")
-
-    with zip_column:
-        zip_data = create_zip(processed_files)
-
-        st.download_button(
-            label="Download All as ZIP",
-            data=zip_data,
-            file_name="vectorized_images.zip",
-            mime="application/zip",
-            key="download-all-zip",
-            on_click="ignore",
-            type="primary",
-            use_container_width=True
-        )
-
-    for index, result in enumerate(processed_files):
-        with st.container(border=True):
-            information_column, svg_column, pdf_column = st.columns(
-                [4, 1.2, 1.2],
-                vertical_alignment="center"
-            )
-
-            with information_column:
-                original_filename = result["svg_filename"].removesuffix(
-                    ".svg"
-                )
-
-                st.markdown(
-                    f"#### {original_filename}"
-                )
-
-                st.caption(
-                    f"{result['svg_filename']} · "
-                    f"{result['pdf_filename']}"
-                )
-
-            with svg_column:
-                st.download_button(
-                    label="Download SVG",
-                    data=result["svg_data"],
-                    file_name=result["svg_filename"],
-                    mime="image/svg+xml",
-                    key=f"svg-{index}-{result['svg_filename']}",
-                    on_click="ignore",
-                    use_container_width=True
-                )
-
-            with pdf_column:
-                st.download_button(
-                    label="Download PDF",
-                    data=result["pdf_data"],
-                    file_name=result["pdf_filename"],
-                    mime="application/pdf",
-                    key=f"pdf-{index}-{result['pdf_filename']}",
-                    on_click="ignore",
-                    use_container_width=True
-                )
-
-    if st.button("Clear Results"):
-        st.session_state.processed_files = []
-        st.rerun()
+render_results()
