@@ -5,6 +5,15 @@ scalable SVG files and vector PDF documents. It applies an adjustable grayscale
 threshold with OpenCV, traces the resulting bitmap with Potrace, and converts
 the SVG output to PDF with CairoSVG.
 
+The application is containerized with Docker and deployed as a public web
+service on Render.
+
+## Live Application
+
+Use the deployed application at:
+
+**[https://masterpiece-0rgt.onrender.com/](https://masterpiece-0rgt.onrender.com/)**
+
 ## Features
 
 - Upload and preview multiple PNG, JPG, JPEG, BMP, or WebP images.
@@ -15,6 +24,7 @@ the SVG output to PDF with CairoSVG.
 - Keep results available across Streamlit reruns and download clicks.
 - Clear results explicitly when they are no longer needed.
 - Run locally with Python 3.11 or in an isolated Docker container.
+- Deploy automatically from the `main` branch to Render.
 
 ## Technologies
 
@@ -27,6 +37,7 @@ the SVG output to PDF with CairoSVG.
 | Potrace | Bitmap-to-SVG vector tracing |
 | CairoSVG and Cairo | SVG-to-vector-PDF conversion |
 | Docker and Docker Compose | Reproducible Linux packaging and operation |
+| Render | Public Docker hosting and automatic deployment |
 
 ## Project Structure
 
@@ -49,7 +60,10 @@ ImageVectorizer/
 Browser
   |
   v
-Streamlit presentation and session state (app.py)
+Render web service / local Docker container
+  |
+  v
+Streamlit presentation and session state (app.py, port 8501)
   |
   v
 Image-processing business logic (image_processor.py)
@@ -77,6 +91,13 @@ dependency.
 
 The remaining files define dependencies, container packaging, deployment
 metadata, ignore rules, and documentation.
+
+## Repository
+
+```bash
+git clone https://github.com/ColinSleiman/MasterPiece.git
+cd MasterPiece
+```
 
 ## Local Installation with Conda
 
@@ -169,6 +190,52 @@ docker compose down
 The application is available at <http://localhost:8501>. The container health
 check calls `http://localhost:8501/_stcore/health`.
 
+## Production Deployment on Render
+
+The production application is deployed from the GitHub repository as a
+Docker-based Render web service. Render builds the root `Dockerfile`, installs
+Potrace and Cairo inside the image, and starts Streamlit with the Docker
+`CMD`.
+
+Production URL:
+[https://masterpiece-0rgt.onrender.com/](https://masterpiece-0rgt.onrender.com/)
+
+### Render Configuration
+
+| Setting | Value |
+| --- | --- |
+| Repository | `ColinSleiman/MasterPiece` |
+| Branch | `main` |
+| Service type | Web Service |
+| Runtime | Docker |
+| Dockerfile path | `./Dockerfile` |
+| Environment variable | `PORT=8501` |
+| Health check path | `/_stcore/health` |
+| Auto-deploy | On commit |
+
+The application listens on `0.0.0.0:8501`, which allows Render to route public
+HTTPS traffic to the Streamlit server. The health endpoint is used to confirm
+that a new container is responsive before the deployment is considered ready.
+
+### Deploying Updates
+
+After making and validating a change locally:
+
+```bash
+git add .
+git commit -m "Describe the change"
+git push origin main
+```
+
+Render watches the `main` branch. A successful push triggers a new Docker build
+and deployment automatically. Deployment progress and runtime logs are
+available from the service's **Events** and **Logs** pages in the Render
+dashboard.
+
+No persistent disk is required. Uploaded images and generated vector files
+remain in memory or temporary storage and are removed automatically; the
+application does not retain user files after the session or container ends.
+
 ## Image-Processing Workflow
 
 For each uploaded file, the processor:
@@ -228,6 +295,22 @@ docker compose ps
 docker compose logs
 ```
 
+### A Render deployment fails
+
+Open the service in the Render dashboard and inspect **Events** and **Logs**.
+Confirm that:
+
+- The runtime is set to Docker.
+- The Dockerfile path is `./Dockerfile`.
+- `PORT` is set to `8501`.
+- The health check path is `/_stcore/health`.
+- The service is deploying the `main` branch.
+
+If a deployment fails during dependency installation, retry only after reading
+the complete build error. If the container starts but never becomes healthy,
+look for the Streamlit startup message showing that it is listening on
+`0.0.0.0:8501`.
+
 ## Notes About Cairo and Potrace
 
 Potrace performs the actual bitmap tracing and must be available as a command on
@@ -237,13 +320,18 @@ platforms; the Dockerfile installs the same runtime dependencies explicitly.
 
 ## Deployment Considerations
 
-- Use a platform that permits the `potrace` executable and native Cairo library.
-- Prefer the included Docker image when the platform supports containers.
-- Keep port 8501 reachable and preserve the Streamlit health endpoint.
+- Production is hosted on Render using the included Dockerfile.
+- Potrace, Cairo, and the OpenMP runtime are installed inside the Docker image.
+- Port 8501 and the Streamlit health endpoint must remain available.
+- The Render filesystem is treated as ephemeral; the application does not rely
+  on generated files surviving a restart or redeployment.
 - Uploaded and generated files are processed in memory or temporary storage;
   results are not persisted after the Streamlit session or container ends.
 - Apply platform upload-size, memory, CPU, and request-time limits appropriate
   for the expected image volume.
+- The public deployment has no authentication. Add access control and stricter
+  upload limits before using it for private files or untrusted high-volume
+  traffic.
 - No credentials or external services are required for the current application.
 
 ## Future Improvements
@@ -257,5 +345,4 @@ platforms; the Dockerfile installs the same runtime dependencies explicitly.
 
 ## Author
 
-Colin Sleiman
-Computer Science Graduate, Antonine University, Lebanon
+Colin Sleiman — Computer Science Graduate, Antonine University, Lebanon
