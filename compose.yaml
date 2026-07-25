@@ -4,6 +4,6 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: image-vectorizer
-    ports:
+    ports: # docker starts application locally
       - "8501:8501"
     restart: unless-stopped
