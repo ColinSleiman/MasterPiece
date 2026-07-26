@@ -1,9 +1,11 @@
+name: imagevectorizer
+
 services:
   image-vectorizer:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: image-vectorizer
-    ports: # docker starts application locally
+    ports:
       - "8501:8501"
     restart: unless-stopped

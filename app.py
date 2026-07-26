@@ -13,7 +13,12 @@ from image_processor import VectorizedImage, process_image
 
 
 SUPPORTED_IMAGE_TYPES = ["png", "jpg", "jpeg", "bmp", "webp"]
-LOGO_PATH = Path(__file__).with_name("logo2_png.png")
+ASSETS_PATH = Path(__file__).resolve().parent / "assets"
+LOGO_PATH = ASSETS_PATH / "img" / "logo.png"
+APP_CSS = (ASSETS_PATH / "css" / "app.css").read_text(encoding="utf-8")
+IMAGE_VIEWER_CSS = (ASSETS_PATH / "css" / "image_viewer.css").read_text(
+    encoding="utf-8"
+)
 LOGO_DATA_URI = (
     "data:image/png;base64,"
     + base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
@@ -37,97 +42,6 @@ IMAGE_VIEWER_HTML = """
     <button class="viewer__close" type="button">Close</button>
     <img class="viewer__full-image" alt="">
 </dialog>
-"""
-
-IMAGE_VIEWER_CSS = """
-.viewer {
-    margin: 0;
-}
-.viewer__trigger {
-    position: relative;
-    display: block;
-    width: 100%;
-    padding: 0;
-    overflow: hidden;
-    border: 0;
-    border-radius: 0.65rem;
-    background: #111827;
-    cursor: zoom-in;
-}
-.viewer__preview {
-    display: block;
-    width: 100%;
-    height: 180px;
-    object-fit: contain;
-    background: #f6f7f9;
-    transition: opacity 160ms ease;
-}
-.viewer__overlay {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    color: white;
-    font-size: 0.95rem;
-    font-weight: 650;
-    opacity: 0;
-    transition: opacity 160ms ease;
-}
-.viewer__trigger:hover .viewer__preview,
-.viewer__trigger:focus-visible .viewer__preview {
-    opacity: 0.52;
-}
-.viewer__trigger:hover .viewer__overlay,
-.viewer__trigger:focus-visible .viewer__overlay {
-    opacity: 1;
-}
-.viewer__caption {
-    margin-top: 0.45rem;
-    overflow: hidden;
-    color: var(--st-text-color);
-    font-size: 0.82rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.viewer__dialog {
-    width: min(72vw, 820px);
-    max-width: none;
-    height: min(76vh, 700px);
-    max-height: none;
-    padding: 3.5rem 1.25rem 1.25rem;
-    overflow: hidden;
-    border: 0;
-    border-radius: 0.85rem;
-    background: #111827;
-    box-shadow: 0 24px 80px rgb(0 0 0 / 45%);
-}
-.viewer__dialog::backdrop {
-    background: rgb(0 0 0 / 72%);
-    backdrop-filter: blur(3px);
-}
-.viewer__full-image {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-}
-.viewer__close {
-    position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
-    padding: 0.45rem 0.8rem;
-    border: 1px solid rgb(255 255 255 / 28%);
-    border-radius: 0.45rem;
-    color: white;
-    background: rgb(255 255 255 / 12%);
-    cursor: pointer;
-}
-@media (max-width: 720px) {
-    .viewer__dialog {
-        width: 90vw;
-        height: 72vh;
-    }
-}
 """
 
 IMAGE_VIEWER_JS = """
@@ -195,25 +109,21 @@ def create_zip(processed_files: list[VectorizedImage]) -> bytes:
             )
     return zip_buffer.getvalue()
 
-
 def initialize_state() -> None:
     """Initialize persistent values used across Streamlit reruns."""
     st.session_state.setdefault("processed_files", [])
     st.session_state.setdefault("processing_errors", [])
     st.session_state.setdefault("uploader_key", 0)
 
-
 def clear_results() -> None:
     """Remove generated results and their associated errors."""
     st.session_state.processed_files = []
     st.session_state.processing_errors = []
 
-
 def clear_selection() -> None:
     """Reset the uploader and remove results created from its previous files."""
     clear_results()
     st.session_state.uploader_key += 1
-
 
 def render_viewable_image(
     image_bytes: bytes,
@@ -238,7 +148,6 @@ def render_viewable_image(
         height=preview_height + 30 if show_caption else preview_height,
     )
 
-
 def render_previews(uploaded_files: list) -> None:
     """Render compact previews in a five-column grid."""
     st.subheader("Image previews")
@@ -253,7 +162,6 @@ def render_previews(uploaded_files: list) -> None:
                 f"upload-viewer-{st.session_state.uploader_key}-{index}",
                 preview_height=140,
             )
-
 
 def process_uploads(uploaded_files: list, threshold_value: int) -> None:
     """Process every upload independently and retain successes and errors."""
@@ -276,7 +184,6 @@ def process_uploads(uploaded_files: list, threshold_value: int) -> None:
     st.session_state.processed_files = processed_files
     st.session_state.processing_errors = processing_errors
 
-
 def render_processing_feedback() -> None:
     """Render persistent processing feedback beside the primary action."""
     processed_files: list[VectorizedImage] = st.session_state.processed_files
@@ -291,7 +198,6 @@ def render_processing_feedback() -> None:
     if processing_errors:
         for message in processing_errors:
             st.caption(f":red[:material/error: Failed to process {message}]")
-
 
 def render_results() -> None:
     """Render persistent download controls."""
@@ -418,150 +324,9 @@ def render_results() -> None:
         for index, result in enumerate(processed_files):
             render_result(result, index, compact=False)
 
-
 initialize_state()
 
-st.html(
-    """
-    <style>
-        .block-container {
-            max-width: 1180px;
-            padding-top: 2.25rem;
-            padding-bottom: 4rem;
-        }
-        [data-testid="stImage"] img {
-            border-radius: 0.6rem;
-            object-fit: contain;
-        }
-        h1 img[alt="MasterPiece logo"] {
-            padding-top: 4px;
-            width: auto;
-            height: 2em;
-            margin-right: 0.15em;
-            object-fit: contain;
-            vertical-align: -0.12em;
-        }
-        .viewable-image {
-            margin: 0;
-        }
-        .viewable-image__trigger {
-            position: relative;
-            display: block;
-            width: 100%;
-            padding: 0;
-            overflow: hidden;
-            border: 0;
-            border-radius: 0.65rem;
-            background: #111827;
-            cursor: zoom-in;
-        }
-        .viewable-image img {
-            display: block;
-            width: 100%;
-            height: 180px;
-            object-fit: contain;
-            background: #f6f7f9;
-            transition: opacity 160ms ease;
-        }
-        .viewable-image__overlay {
-            position: absolute;
-            inset: 0;
-            display: grid;
-            place-items: center;
-            color: white;
-            font-size: 0.95rem;
-            font-weight: 650;
-            letter-spacing: 0.02em;
-            opacity: 0;
-            transition: opacity 160ms ease;
-        }
-        .viewable-image__trigger:hover img,
-        .viewable-image__trigger:focus-visible img {
-            opacity: 0.52;
-        }
-        .viewable-image__trigger:hover .viewable-image__overlay,
-        .viewable-image__trigger:focus-visible .viewable-image__overlay {
-            opacity: 1;
-        }
-        .viewable-image__trigger:focus-visible {
-            outline: 3px solid var(--st-primary-color);
-            outline-offset: 2px;
-        }
-        .viewable-image figcaption {
-            margin-top: 0.45rem;
-            overflow: hidden;
-            color: var(--st-text-color);
-            font-size: 0.82rem;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .image-lightbox {
-            width: min(92vw, 1100px);
-            max-width: none;
-            height: min(90vh, 900px);
-            max-height: none;
-            padding: 3.5rem 1.25rem 1.25rem;
-            overflow: hidden;
-            border: 0;
-            border-radius: 0.85rem;
-            background: #111827;
-            box-shadow: 0 24px 80px rgb(0 0 0 / 45%);
-        }
-        .image-lightbox::backdrop {
-            background: rgb(0 0 0 / 72%);
-            backdrop-filter: blur(3px);
-        }
-        .image-lightbox img {
-            display: block;
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        .image-lightbox__close {
-            position: absolute;
-            top: 0.75rem;
-            right: 0.75rem;
-            padding: 0.45rem 0.8rem;
-            border: 1px solid rgb(255 255 255 / 28%);
-            border-radius: 0.45rem;
-            color: white;
-            background: rgb(255 255 255 / 12%);
-            cursor: pointer;
-        }
-        .image-lightbox__close:hover {
-            background: rgb(255 255 255 / 22%);
-        }
-        [class*="st-key-result-card-"] {
-            transition: background-color 160ms ease, border-color 160ms ease;
-        }
-        [class*="st-key-result-card-"]:hover {
-            background-color: color-mix(
-                in srgb,
-                var(--st-primary-color) 7%,
-                transparent
-            );
-            border-color: color-mix(
-                in srgb,
-                var(--st-primary-color) 28%,
-                transparent
-            );
-        }
-        .st-key-clear-selection button {
-            min-height: 1.95rem !important;
-            padding: 0.25rem 0.55rem !important;
-            font-size: 0.78rem !important;
-        }
-        [data-testid="stFileUploader"] {
-            max-width: 760px;
-        }
-        div[data-testid="stButton"] button,
-        div[data-testid="stDownloadButton"] button {
-            min-height: 2.6rem;
-            border-radius: 0.5rem;
-        }
-    </style>
-    """
-)
+st.html(f"<style>{APP_CSS}</style>")
 
 st.title(f"![MasterPiece logo]({LOGO_DATA_URI}) MasterPiece - Image Vectorizer Tool")
 st.caption(

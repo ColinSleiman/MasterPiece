@@ -1,0 +1,99 @@
+.viewer {
+    margin: 0;
+}
+
+.viewer__trigger {
+    position: relative;
+    display: block;
+    width: 100%;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    border-radius: 0.65rem;
+    background: #111827;
+    cursor: zoom-in;
+}
+
+.viewer__preview {
+    display: block;
+    width: 100%;
+    height: 180px;
+    object-fit: contain;
+    background: #f6f7f9;
+    transition: opacity 160ms ease;
+}
+
+.viewer__overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: white;
+    font-size: 0.95rem;
+    font-weight: 650;
+    opacity: 0;
+    transition: opacity 160ms ease;
+}
+
+.viewer__trigger:hover .viewer__preview,
+.viewer__trigger:focus-visible .viewer__preview {
+    opacity: 0.52;
+}
+
+.viewer__trigger:hover .viewer__overlay,
+.viewer__trigger:focus-visible .viewer__overlay {
+    opacity: 1;
+}
+
+.viewer__caption {
+    margin-top: 0.45rem;
+    overflow: hidden;
+    color: var(--st-text-color);
+    font-size: 0.82rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.viewer__dialog {
+    width: min(72vw, 820px);
+    max-width: none;
+    height: min(76vh, 700px);
+    max-height: none;
+    padding: 3.5rem 1.25rem 1.25rem;
+    overflow: hidden;
+    border: 0;
+    border-radius: 0.85rem;
+    background: #111827;
+    box-shadow: 0 24px 80px rgb(0 0 0 / 45%);
+}
+
+.viewer__dialog::backdrop {
+    background: rgb(0 0 0 / 72%);
+    backdrop-filter: blur(3px);
+}
+
+.viewer__full-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.viewer__close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    padding: 0.45rem 0.8rem;
+    border: 1px solid rgb(255 255 255 / 28%);
+    border-radius: 0.45rem;
+    color: white;
+    background: rgb(255 255 255 / 12%);
+    cursor: pointer;
+}
+
+@media (max-width: 720px) {
+    .viewer__dialog {
+        width: 90vw;
+        height: 72vh;
+    }
+}

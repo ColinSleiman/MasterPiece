@@ -1,131 +1,179 @@
-# Image Vectorizer
+# MasterPiece Image Vectorizer
 
-Image Vectorizer is a Streamlit application that converts raster images into
-scalable SVG files and vector PDF documents. It applies an adjustable grayscale
-threshold with OpenCV, traces the resulting bitmap with Potrace, and converts
-the SVG output to PDF with CairoSVG.
+MasterPiece Image Vectorizer is a Streamlit application that converts raster
+images into scalable SVG files and vector PDF documents. It uses OpenCV to
+prepare a black-and-white bitmap, Potrace to trace that bitmap as SVG, and
+CairoSVG to produce a vector PDF from the SVG.
 
-The application is containerized with Docker and deployed as a public web
-service on Render.
+## Live application
 
-## Live Application
-
-Use the deployed application at:
-
-**[https://masterpiece-0rgt.onrender.com/](https://masterpiece-0rgt.onrender.com/)**
+The deployed application is available at
+[https://masterpiece-0rgt.onrender.com/](https://masterpiece-0rgt.onrender.com/).
 
 ## Features
 
-- Upload and preview multiple PNG, JPG, JPEG, BMP, or WebP images.
-- Adjust the binary threshold from 0 to 255.
-- Continue a batch when an individual file fails.
-- Download each generated SVG and PDF independently.
-- Download all successful results in one compressed ZIP archive.
-- Keep results available across Streamlit reruns and download clicks.
-- Clear results explicitly when they are no longer needed.
-- Run locally with Python 3.11 or in an isolated Docker container.
-- Deploy automatically from the `main` branch to Render.
+- Upload multiple PNG, JPG, JPEG, BMP, or WebP images.
+- Preview uploaded images before processing.
+- Adjust the grayscale threshold from 0 to 255; `180` is the default.
+- Continue processing a batch when an individual image fails.
+- Review results in a grid or list layout.
+- Download each result as SVG or vector PDF.
+- Download all successful results in a ZIP archive.
+- Keep generated results available during Streamlit reruns and download clicks.
+- Clear the selected uploads or generated results explicitly.
 
-## Technologies
-
-| Technology | Responsibility |
-| --- | --- |
-| Python 3.11 | Application runtime |
-| Streamlit | Web interface and session state |
-| OpenCV and NumPy | Image decoding, grayscale data, and thresholding |
-| Pillow | Temporary PBM creation |
-| Potrace | Bitmap-to-SVG vector tracing |
-| CairoSVG and Cairo | SVG-to-vector-PDF conversion |
-| Docker and Docker Compose | Reproducible Linux packaging and operation |
-| Render | Public Docker hosting and automatic deployment |
-
-## Project Structure
+## Project structure
 
 ```text
-ImageVectorizer/
-|-- app.py
-|-- image_processor.py
-|-- requirements.txt
-|-- Dockerfile
-|-- compose.yaml
-|-- packages.txt
-|-- .dockerignore
-|-- .gitignore
-`-- README.md
+Masterpiece/
+`-- ImageVectorizer/                  # Repository root
+    |-- .git/                         # Local Git metadata
+    |-- .vscode/                      # Local VS Code workspace settings
+    |   `-- settings.json
+    |-- assets/                       # Application presentation assets
+    |   |-- css/
+    |   |   |-- app.css
+    |   |   `-- image_viewer.css
+    |   `-- img/
+    |       `-- logo.png
+    |-- docker/                       # Container configuration
+    |   |-- Dockerfile
+    |   |-- Dockerfile.dockerignore
+    |   `-- compose.yaml
+    |-- .gitignore
+    |-- app.py                        # Streamlit entry point
+    |-- image_processor.py            # Raster-to-vector processing
+    |-- packages.txt                  # Native package manifest
+    |-- requirements.txt              # Python dependencies
+    `-- README.md
 ```
 
-## Solution Architecture
+`Masterpiece/` is the parent folder on the local machine. `ImageVectorizer/` is
+the repository and command-working directory. Run all documented Python,
+Docker, and Git commands from `ImageVectorizer/` unless a section explicitly
+states otherwise.
 
-```text
-Browser
-  |
-  v
-Render web service / local Docker container
-  |
-  v
-Streamlit presentation and session state (app.py, port 8501)
-  |
-  v
-Image-processing business logic (image_processor.py)
-  |
-  +-- OpenCV: decode, grayscale, threshold, invert
-  +-- Pillow: create temporary PBM
-  +-- Potrace: create SVG
-  `-- CairoSVG/Cairo: create vector PDF
-```
+### File responsibilities
 
-Temporary PBM, SVG, and PDF files exist only inside a
-`tempfile.TemporaryDirectory`. The application reads the final SVG and PDF into
-memory before that directory is removed.
+- `app.py` defines the Streamlit page, upload controls, previews, session state,
+  processing feedback, and download controls. It loads the logo and CSS from
+  `assets/`.
+- `image_processor.py` contains the raster-to-vector processing pipeline. It
+  has no Streamlit dependency.
+- `assets/css/app.css` contains page-level Streamlit styling.
+- `assets/css/image_viewer.css` styles the reusable preview and full-size image
+  viewer component.
+- `assets/img/logo.png` is used beside the page title and as the browser favicon.
+- `requirements.txt` pins the Python dependencies.
+- `packages.txt` lists native packages for Debian-compatible platforms that
+  support this manifest. The Docker image installs its native packages directly.
+- `docker/Dockerfile` defines the production-compatible container image.
+- `docker/compose.yaml` builds and runs the image locally on port `8501`.
+- `docker/Dockerfile.dockerignore` excludes local environments, caches, secrets,
+  and generated files from the Docker build context.
 
-## Separation of Concerns
+The `.git/` and `.vscode/` entries describe the current local workspace. Their
+contents can differ between machines. Editor settings are excluded from Git and
+from the Docker image; `.git/` itself stores the repository metadata.
 
-`app.py` contains the presentation layer: page configuration, uploads,
-previews, controls, progress, messages, ZIP creation, downloads, and Streamlit
-session state. It does not contain OpenCV, Potrace, PBM, SVG, or PDF processing.
+## Processing workflow
 
-`image_processor.py` contains the business logic. It reads an uploaded-file-like
-object, performs the raster processing pipeline, invokes Potrace, converts the
-SVG to PDF, and returns structured filenames and bytes. It has no Streamlit
-dependency.
+For each uploaded image, the application:
 
-The remaining files define dependencies, container packaging, deployment
-metadata, ignore rules, and documentation.
+1. Reads the uploaded bytes and decodes the image as grayscale.
+2. Applies the selected binary threshold.
+3. Inverts the black-and-white result for Potrace.
+4. Creates a temporary PBM bitmap.
+5. Runs Potrace to generate an SVG.
+6. Converts the SVG to a vector PDF with CairoSVG.
+7. Reads the SVG and PDF into memory for download.
+8. Removes the temporary processing directory automatically.
 
-## Repository
+Uploaded and generated files are not stored permanently by the application.
+Results remain in the active Streamlit session until they are cleared or the
+session ends.
+
+## Run with Docker (recommended)
+
+Docker is the simplest local setup because the image includes Python 3.11,
+Potrace, Cairo, and the other native runtime libraries.
+
+### Prerequisites
+
+- Docker Desktop on Windows or macOS, or Docker Engine on Linux.
+- Docker Compose v2, available through the `docker compose` command.
+
+### Start the application
+
+Run this command from the repository root:
 
 ```bash
-git clone https://github.com/ColinSleiman/MasterPiece.git
-cd MasterPiece
+docker compose -f docker/compose.yaml up --build
 ```
 
-## Local Installation with Conda
+Open [http://localhost:8501](http://localhost:8501).
 
-Create and activate the requested Python 3.11 environment:
+Press `Ctrl+C` to stop a foreground run. Then remove the stopped container and
+network with:
+
+```bash
+docker compose -f docker/compose.yaml down
+```
+
+### Run in the background
+
+```bash
+docker compose -f docker/compose.yaml up -d --build
+```
+
+Useful lifecycle commands:
+
+```bash
+docker compose -f docker/compose.yaml ps
+docker compose -f docker/compose.yaml logs -f
+docker compose -f docker/compose.yaml down
+```
+
+### Force a clean rebuild
+
+Use a clean rebuild when changing base packages or diagnosing a stale Docker
+cache:
+
+```bash
+docker compose -f docker/compose.yaml build --no-cache
+docker compose -f docker/compose.yaml up
+```
+
+The Compose file is stored in `docker/`, but its build context is the repository
+root. This is intentional: the Dockerfile must be able to copy `app.py`,
+`image_processor.py`, `requirements.txt`, and `assets/` into the image.
+
+The container health check uses
+[http://localhost:8501/_stcore/health](http://localhost:8501/_stcore/health).
+A healthy response is `ok` with HTTP status `200`.
+
+## Run directly with Conda
+
+Use this option when you want to run Streamlit without Docker. Python packages
+alone are not enough: Potrace and Cairo are native dependencies and must also be
+installed.
+
+### 1. Create the environment
 
 ```bash
 conda create -n imagevectorizer_env python=3.11
 conda activate imagevectorizer_env
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
 ```
 
-The direct Python dependencies are pinned in `requirements.txt`. The headless
-OpenCV distribution is used because the application does not need OpenCV desktop
-windows.
+### 2. Install native dependencies
 
-### Required Native Dependencies
-
-Potrace is an executable, and Cairo is the native rendering library used by
-CairoSVG. They are not pip packages.
-
-For a Conda environment on Windows, macOS, or Linux:
+On Windows, macOS, or Linux with Conda:
 
 ```bash
 conda install -c conda-forge cairo potrace
 ```
 
-On Debian or Ubuntu:
+On Debian or Ubuntu without Conda-managed native packages:
 
 ```bash
 sudo apt-get update
@@ -138,88 +186,64 @@ On macOS with Homebrew:
 brew install cairo potrace
 ```
 
-Verify the local environment:
+### 3. Install Python dependencies
+
+From the repository root:
 
 ```bash
-python -c "import cv2, numpy, PIL, cairosvg, streamlit; print('Python dependencies import successfully')"
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+### 4. Verify the environment
+
+```bash
+python -c "import cv2, numpy, PIL, cairosvg, streamlit; print('Python dependencies are available')"
 potrace --version
 ```
 
-## Run Locally
-
-Activate the environment and start Streamlit:
+### 5. Start Streamlit
 
 ```bash
-conda activate imagevectorizer_env
 python -m streamlit run app.py
 ```
 
-Open <http://localhost:8501>.
+Open [http://localhost:8501](http://localhost:8501).
 
-## Run with Docker
+## Using the application
 
-Docker builds its own isolated Debian-based Python 3.11 environment. It does not
-use or depend on the local Conda environment.
+1. Select one or more supported raster images.
+2. Review the image previews.
+3. Adjust the threshold if necessary. Higher values include more light pixels
+   in the traced foreground.
+4. Select **Process images**.
+5. Review any per-file error messages; other valid files continue processing.
+6. Download individual SVG or PDF results, or download all results as a ZIP.
+7. Select **Clear results** when the generated files are no longer needed.
 
-Build the image:
+## Production deployment on Render
 
-```bash
-docker compose build --no-cache
-```
+The production service uses the repository's Docker image. Render does not use
+`docker/compose.yaml`; Compose is only for local container management.
 
-Start in the foreground:
-
-```bash
-docker compose up
-```
-
-Or start in the background:
-
-```bash
-docker compose up -d
-```
-
-Useful lifecycle commands:
-
-```bash
-docker compose logs -f
-docker compose ps
-docker compose down
-```
-
-The application is available at <http://localhost:8501>. The container health
-check calls `http://localhost:8501/_stcore/health`.
-
-## Production Deployment on Render
-
-The production application is deployed from the GitHub repository as a
-Docker-based Render web service. Render builds the root `Dockerfile`, installs
-Potrace and Cairo inside the image, and starts Streamlit with the Docker
-`CMD`.
-
-Production URL:
-[https://masterpiece-0rgt.onrender.com/](https://masterpiece-0rgt.onrender.com/)
-
-### Render Configuration
+Configure the Render web service as follows:
 
 | Setting | Value |
 | --- | --- |
 | Repository | `ColinSleiman/MasterPiece` |
 | Branch | `main` |
-| Service type | Web Service |
 | Runtime | Docker |
-| Dockerfile path | `./Dockerfile` |
+| Dockerfile path | `./docker/Dockerfile` |
+| Docker build context | Repository root |
 | Environment variable | `PORT=8501` |
 | Health check path | `/_stcore/health` |
-| Auto-deploy | On commit |
+| Auto-deploy | Enabled for `main` |
 
-The application listens on `0.0.0.0:8501`, which allows Render to route public
-HTTPS traffic to the Streamlit server. The health endpoint is used to confirm
-that a new container is responsive before the deployment is considered ready.
+The Docker command starts Streamlit on `0.0.0.0:8501`, allowing Render to route
+traffic to the container. The health check confirms that the Streamlit server
+is ready before a deployment is considered healthy.
 
-### Deploying Updates
-
-After making and validating a change locally:
+After validating a change locally:
 
 ```bash
 git add .
@@ -227,121 +251,110 @@ git commit -m "Describe the change"
 git push origin main
 ```
 
-Render watches the `main` branch. A successful push triggers a new Docker build
-and deployment automatically. Deployment progress and runtime logs are
-available from the service's **Events** and **Logs** pages in the Render
-dashboard.
-
-No persistent disk is required. Uploaded images and generated vector files
-remain in memory or temporary storage and are removed automatically; the
-application does not retain user files after the session or container ends.
-
-## Image-Processing Workflow
-
-For each uploaded file, the processor:
-
-1. Reads the uploaded bytes and decodes the image as grayscale.
-2. Applies `cv2.THRESH_BINARY` with the selected threshold.
-3. Inverts the binary result.
-4. Writes a temporary PBM bitmap.
-5. runs `potrace input.pbm -s -o output.svg`.
-6. Converts the SVG to a vector PDF with CairoSVG.
-7. Returns both generated files as bytes for download.
-8. Automatically removes all temporary processing files.
-
-## Usage
-
-1. Upload one or more supported raster images.
-2. Review the compact image previews.
-3. Adjust the threshold. A higher value includes more light pixels in the
-   traced foreground.
-4. Select **Process Images** and follow the batch progress.
-5. Review any per-file errors; other valid files continue processing.
-6. Download individual SVG or PDF files, or select **Download All as ZIP**.
-7. Select **Clear Results** when finished.
+A successful push to `main` triggers a new Render deployment when auto-deploy is
+enabled. Deployment progress and runtime output are available in the service's
+**Events** and **Logs** pages.
 
 ## Troubleshooting
 
-### `Potrace is not installed or is not available on PATH`
+### Streamlit or another Python dependency is missing
 
-Install Potrace with Conda or the platform package manager, reactivate the shell,
-and verify `potrace --version`. Docker installs Potrace automatically.
+Confirm that the intended Conda environment is active, then reinstall the
+pinned dependencies:
 
-### Cairo or CairoSVG cannot load a native library
+```bash
+conda activate imagevectorizer_env
+python -m pip install -r requirements.txt
+```
 
-Install the native Cairo package, reactivate `imagevectorizer_env`, and retry the
-import check. On Windows, installing Cairo from `conda-forge` inside the active
-environment avoids hard-coded machine-specific library paths.
+### Potrace is unavailable
 
-### An image cannot be decoded
+If the application reports that Potrace is not installed or not on `PATH`,
+install it through Conda or the operating-system package manager and verify:
 
-Confirm that the file contains valid PNG, JPEG, BMP, or WebP image data. Changing
-a filename extension does not convert the underlying format.
+```bash
+potrace --version
+```
+
+Docker users do not need to install Potrace on the host because it is included
+in the image.
+
+### CairoSVG cannot load Cairo
+
+CairoSVG is a Python package, but PDF generation also requires the native Cairo
+library. Install Cairo in the active Conda environment or through the operating
+system, then restart the terminal and application.
+
+### An uploaded image cannot be decoded
+
+Confirm that the file contains valid PNG, JPEG, BMP, or WebP data. Renaming a
+file extension does not convert the underlying image format.
 
 ### Port 8501 is already in use
 
-Stop the other service or change the host side of the Compose mapping, for
-example `"8502:8501"`, then open `http://localhost:8502`.
+Stop the other process or change the host-side port in `docker/compose.yaml`:
 
-### Docker commands cannot connect to the daemon
+```yaml
+ports:
+  - "8502:8501"
+```
 
-Start Docker Desktop. On Windows, confirm that the WSL 2 engine is enabled, then
-run `docker compose ps` again.
+Then open `http://localhost:8502`.
 
-### Inspect container startup failures
+### Docker cannot connect to the daemon
+
+Start Docker Desktop. On Windows, confirm that Docker Desktop is using its WSL 2
+engine, then retry:
 
 ```bash
-docker compose ps
-docker compose logs
+docker compose -f docker/compose.yaml ps
 ```
+
+### The container does not become healthy
+
+Inspect the service status and logs:
+
+```bash
+docker compose -f docker/compose.yaml ps
+docker compose -f docker/compose.yaml logs
+```
+
+Look for the Streamlit startup message indicating that it is listening on
+`0.0.0.0:8501`. Also confirm that the Docker build context remains `..` in
+`docker/compose.yaml`.
 
 ### A Render deployment fails
 
-Open the service in the Render dashboard and inspect **Events** and **Logs**.
-Confirm that:
+Confirm the following in Render:
 
-- The runtime is set to Docker.
-- The Dockerfile path is `./Dockerfile`.
+- Runtime is set to Docker.
+- Dockerfile path is `./docker/Dockerfile`.
+- The build context is the repository root.
 - `PORT` is set to `8501`.
-- The health check path is `/_stcore/health`.
-- The service is deploying the `main` branch.
+- Health check path is `/_stcore/health`.
+- The service is deploying the intended branch.
 
-If a deployment fails during dependency installation, retry only after reading
-the complete build error. If the container starts but never becomes healthy,
-look for the Streamlit startup message showing that it is listening on
-`0.0.0.0:8501`.
+Read the complete build or runtime error in Render's **Events** and **Logs**
+before retrying the deployment.
 
-## Notes About Cairo and Potrace
+## Operational notes
 
-Potrace performs the actual bitmap tracing and must be available as a command on
-`PATH`. CairoSVG is a Python package, but it uses the native Cairo library for
-PDF rendering. `packages.txt` supports Debian-package-aware deployment
-platforms; the Dockerfile installs the same runtime dependencies explicitly.
+- Generated PBM, SVG, PDF, and ZIP files are temporary or held in memory.
+- The Render filesystem is treated as ephemeral; no persistent disk is needed.
+- The public application has no authentication.
+- Apply appropriate upload-size, memory, CPU, and request-time limits before
+  accepting private files or high-volume untrusted traffic.
+- No credentials or external service integrations are required by the current
+  application.
 
-## Deployment Considerations
-
-- Production is hosted on Render using the included Dockerfile.
-- Potrace, Cairo, and the OpenMP runtime are installed inside the Docker image.
-- Port 8501 and the Streamlit health endpoint must remain available.
-- The Render filesystem is treated as ephemeral; the application does not rely
-  on generated files surviving a restart or redeployment.
-- Uploaded and generated files are processed in memory or temporary storage;
-  results are not persisted after the Streamlit session or container ends.
-- Apply platform upload-size, memory, CPU, and request-time limits appropriate
-  for the expected image volume.
-- The public deployment has no authentication. Add access control and stricter
-  upload limits before using it for private files or untrusted high-volume
-  traffic.
-- No credentials or external services are required for the current application.
-
-## Future Improvements
+## Potential improvements
 
 - Live threshold previews before vectorization.
-- Additional exposed Potrace tracing options.
-- Duplicate-output-name disambiguation for unusually named batches.
-- Automated unit and browser tests in continuous integration.
-- Optional limits for image dimensions and total batch size.
+- Additional Potrace tracing controls.
+- Automated processing and browser tests in continuous integration.
+- Configurable image-dimension and batch-size limits.
 - Additional vector export formats.
+- Optional authentication and access control.
 
 ## Author
 
