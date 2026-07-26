@@ -15,7 +15,7 @@ from image_processor import VectorizedImage, process_image
 SUPPORTED_IMAGE_TYPES = ["png", "jpg", "jpeg", "bmp", "webp"]
 
 st.set_page_config(
-    page_title="Image Vectorizer",
+    page_title="Masterpiece Image Vectorizer",
     page_icon=":material/polyline:",
     layout="wide",
 )
@@ -550,7 +550,7 @@ st.html(
     """
 )
 
-st.title("Image Vectorizer")
+st.title("MasterPiece - Image Vectorizer Tool")
 st.caption(
     "Convert PNG, JPEG, BMP, or WebP images into scalable SVG and vector PDF files."
 )
