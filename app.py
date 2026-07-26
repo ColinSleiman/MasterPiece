@@ -13,10 +13,15 @@ from image_processor import VectorizedImage, process_image
 
 
 SUPPORTED_IMAGE_TYPES = ["png", "jpg", "jpeg", "bmp", "webp"]
+LOGO_PATH = Path(__file__).with_name("logo2_png.png")
+LOGO_DATA_URI = (
+    "data:image/png;base64,"
+    + base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
+)
 
 st.set_page_config(
     page_title="Masterpiece Image Vectorizer",
-    page_icon=":material/polyline:",
+    page_icon=str(LOGO_PATH),
     layout="wide",
 )
 
@@ -428,6 +433,14 @@ st.html(
             border-radius: 0.6rem;
             object-fit: contain;
         }
+        h1 img[alt="MasterPiece logo"] {
+            padding-top: 4px;
+            width: auto;
+            height: 2em;
+            margin-right: 0.15em;
+            object-fit: contain;
+            vertical-align: -0.12em;
+        }
         .viewable-image {
             margin: 0;
         }
@@ -550,7 +563,7 @@ st.html(
     """
 )
 
-st.title("MasterPiece - Image Vectorizer Tool")
+st.title(f"![MasterPiece logo]({LOGO_DATA_URI}) MasterPiece - Image Vectorizer Tool")
 st.caption(
     "Convert PNG, JPEG, BMP, or WebP images into scalable SVG and vector PDF files."
 )
