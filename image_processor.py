@@ -91,10 +91,23 @@ def process_image(
 
     original_filename = _uploaded_filename(uploaded_file)
     file_bytes = np.frombuffer(_read_uploaded_bytes(uploaded_file), dtype=np.uint8)
-    grayscale_image = cv2.imdecode(file_bytes, cv2.IMREAD_GRAYSCALE)
+    decoded_image = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
 
-    if grayscale_image is None:
+    if decoded_image is None:
         raise ValueError(f"Unable to decode image: {original_filename}")
+
+    if decoded_image.ndim == 3 and decoded_image.shape[2] == 4:
+        # OpenCV's grayscale decoder discards alpha. Transparent black pixels
+        # would otherwise become a black background and trace as an empty page.
+        foreground_gray = cv2.cvtColor(decoded_image, cv2.COLOR_BGRA2GRAY)
+        channel_max = np.iinfo(decoded_image.dtype).max
+        alpha = decoded_image[:, :, 3].astype(np.float32) / channel_max
+        grayscale_image = np.rint(
+            (foreground_gray.astype(np.float32) / channel_max * alpha
+             + (1 - alpha)) * 255
+        ).astype(np.uint8)
+    else:
+        grayscale_image = cv2.imdecode(file_bytes, cv2.IMREAD_GRAYSCALE)
 
     _, binary_image = cv2.threshold(
         grayscale_image,
@@ -102,6 +115,11 @@ def process_image(
         255,
         cv2.THRESH_BINARY,
     )
+    if not np.any(binary_image):
+        raise ValueError(
+            "The selected threshold leaves no traceable detail. "
+            "Try a lower threshold or an image with more contrast."
+        )
     inverted_image = 255 - binary_image
     output_stem = _safe_output_stem(original_filename)
     svg_filename = f"{output_stem}.svg"
