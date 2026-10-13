@@ -5,6 +5,31 @@ images into scalable SVG files and vector PDF documents. It uses OpenCV to
 prepare a black-and-white bitmap, Potrace to trace that bitmap as SVG, and
 CairoSVG to produce a vector PDF from the SVG.
 
+## Table of contents
+
+- [Live application](#live-application)
+- [Features](#features)
+- [Project structure](#project-structure)
+  - [File responsibilities](#file-responsibilities)
+- [Processing workflow](#processing-workflow)
+- [Run with Docker (recommended)](#run-with-docker-recommended)
+  - [Prerequisites](#prerequisites)
+  - [Start the application](#start-the-application)
+  - [Run in the background](#run-in-the-background)
+  - [Force a clean rebuild](#force-a-clean-rebuild)
+- [Run directly with Conda](#run-directly-with-conda)
+  - [1. Create the environment](#1-create-the-environment)
+  - [2. Install native dependencies](#2-install-native-dependencies)
+  - [3. Install Python dependencies](#3-install-python-dependencies)
+  - [4. Verify the environment](#4-verify-the-environment)
+  - [5. Start Streamlit](#5-start-streamlit)
+- [Using the application](#using-the-application)
+- [Production deployment on Render](#production-deployment-on-render)
+- [Troubleshooting](#troubleshooting)
+- [Operational notes](#operational-notes)
+- [Potential improvements](#potential-improvements)
+- [Author](#author)
+
 ## Live application
 
 The deployed application is available at
@@ -17,7 +42,7 @@ The deployed application is available at
 - Adjust the grayscale threshold from 0 to 255; `180` is the default.
 - Continue processing a batch when an individual image fails.
 - Review results in a grid or list layout.
-- Download each result as SVG or vector PDF.
+- Download each result as SVG, vector PDF, or a ZIP containing both files.
 - Download all successful results in a ZIP archive.
 - Keep generated results available during Streamlit reruns and download clicks.
 - Clear the selected uploads or generated results explicitly.
@@ -257,85 +282,16 @@ enabled. Deployment progress and runtime output are available in the service's
 
 ## Troubleshooting
 
-### Streamlit or another Python dependency is missing
-
-Confirm that the intended Conda environment is active, then reinstall the
-pinned dependencies:
-
-```bash
-conda activate imagevectorizer_env
-python -m pip install -r requirements.txt
-```
-
-### Potrace is unavailable
-
-If the application reports that Potrace is not installed or not on `PATH`,
-install it through Conda or the operating-system package manager and verify:
-
-```bash
-potrace --version
-```
-
-Docker users do not need to install Potrace on the host because it is included
-in the image.
-
-### CairoSVG cannot load Cairo
-
-CairoSVG is a Python package, but PDF generation also requires the native Cairo
-library. Install Cairo in the active Conda environment or through the operating
-system, then restart the terminal and application.
-
-### An uploaded image cannot be decoded
-
-Confirm that the file contains valid PNG, JPEG, BMP, or WebP data. Renaming a
-file extension does not convert the underlying image format.
-
-### Port 8501 is already in use
-
-Stop the other process or change the host-side port in `docker/compose.yaml`:
-
-```yaml
-ports:
-  - "8502:8501"
-```
-
-Then open `http://localhost:8502`.
-
-### Docker cannot connect to the daemon
-
-Start Docker Desktop. On Windows, confirm that Docker Desktop is using its WSL 2
-engine, then retry:
-
-```bash
-docker compose -f docker/compose.yaml ps
-```
-
-### The container does not become healthy
-
-Inspect the service status and logs:
-
-```bash
-docker compose -f docker/compose.yaml ps
-docker compose -f docker/compose.yaml logs
-```
-
-Look for the Streamlit startup message indicating that it is listening on
-`0.0.0.0:8501`. Also confirm that the Docker build context remains `..` in
-`docker/compose.yaml`.
-
-### A Render deployment fails
-
-Confirm the following in Render:
-
-- Runtime is set to Docker.
-- Dockerfile path is `./docker/Dockerfile`.
-- The build context is the repository root.
-- `PORT` is set to `8501`.
-- Health check path is `/_stcore/health`.
-- The service is deploying the intended branch.
-
-Read the complete build or runtime error in Render's **Events** and **Logs**
-before retrying the deployment.
+| Problem | Likely cause | Resolution |
+| --- | --- | --- |
+| **Streamlit or another Python dependency is missing** | The intended Conda environment is inactive, or its packages are incomplete. | Run `conda activate imagevectorizer_env`, then `python -m pip install -r requirements.txt`. |
+| **Potrace is unavailable** | Potrace is not installed or is missing from `PATH`. | Install Potrace through Conda or the operating-system package manager, then run `potrace --version`. Docker users do not need a host installation because Potrace is included in the image. |
+| **CairoSVG cannot load Cairo** | The CairoSVG Python package is installed, but the native Cairo library is missing. | Install Cairo in the active Conda environment or through the operating system, then restart the terminal and application. |
+| **An uploaded image cannot be decoded** | The file is corrupt, unsupported, or has an extension that does not match its real format. | Confirm that the file contains valid PNG, JPEG, BMP, or WebP data. Renaming a file extension does not convert the image. |
+| **Port 8501 is already in use** | Another application or container is listening on port `8501`. | Stop the other service, or change the mapping in `docker/compose.yaml` from `"8501:8501"` to `"8502:8501"`, then open `http://localhost:8502`. |
+| **Docker cannot connect to the daemon** | Docker Desktop is stopped or its Windows WSL 2 engine is unavailable. | Start Docker Desktop, confirm that WSL 2 is enabled, then run `docker compose -f docker/compose.yaml ps`. |
+| **The container does not become healthy** | Streamlit failed during startup, or the Docker paths or port configuration are incorrect. | Run `docker compose -f docker/compose.yaml ps` and `docker compose -f docker/compose.yaml logs`. Look for the `0.0.0.0:8501` startup message and confirm that `build.context` remains `..` in `docker/compose.yaml`. |
+| **A Render deployment fails** | The Dockerfile path, build context, port, health check, or deployed branch is incorrect. | Confirm Docker runtime, Dockerfile path `./docker/Dockerfile`, repository-root build context, `PORT=8501`, health path `/_stcore/health`, and the intended branch. Read the complete error in Render's **Events** and **Logs** before retrying. |
 
 ## Operational notes
 

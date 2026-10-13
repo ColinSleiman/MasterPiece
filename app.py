@@ -280,6 +280,16 @@ def render_results() -> None:
                         icon=":material/download:",
                         width="stretch",
                     )
+                st.download_button(
+                    "SVG + PDF (ZIP)",
+                    data=create_zip([result]),
+                    file_name=f"{Path(result['svg_filename']).stem}.zip",
+                    mime="application/zip",
+                    key=f"download-zip-grid-{index}",
+                    on_click="ignore",
+                    icon=":material/folder_zip:",
+                    width="stretch",
+                )
                 return
 
             information_column, svg_column, pdf_column = st.columns(
